@@ -1,0 +1,648 @@
+/*
+- ============================================================================
+- PROYECTO AFE: JUEGO CUATRO EN LÍNEA EN C
+-  INTEGRANTESSS (Nicol, Alejo, Mica, Jere)
+- ============================================================================
+
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define N 4
+#define FILAS 6
+#define COLUMNAS 7
+
+typedef struct {
+    int idJugador;
+    char usuario[11];
+    char clave[11];
+    int rachaGanadas;
+    int cantidadVictorias;
+    int partidasJugadas;
+} TJugador;
+
+/* Estructura para registrar el resumen de la partida */
+typedef struct {
+    int idJugador1; /* ID del Jugador 1 */
+    int idJugador2; /* ID del Jugador 2 */
+    int usuario1[11];
+    int usuario2[11];
+    int movJugador1; /* Movimientos válidos de J1 */
+    int movJugador2; /* Movimientos válidos de J2 */
+    int cantTurnos; /* Cantidad total de turnos válidos */
+    int resultado; /* 1: Gana J1, 2: Gana J2, 0: Empate, -1: Descalificado J1, -2: Descalificado J2 */
+    char motivo[50]; /* Motivo de finalización de la partida */
+    int faltasJ1;
+    int faltasJ2;
+    int turno;
+    int bandera_fin;
+} TPartida;
+
+// Prototipos de funciones
+void mostrar_menu(void);
+
+void mostrar_estadisticas(TJugador J[], int n);
+
+void iniciar_partida(TJugador J[], int n);
+
+void mostrar_inicioyjugadores(TJugador J[], int n);
+
+void inicio_sesion(int *jugador1, int *jugador2, TJugador J[], int n);
+
+int posicion_jugador(TJugador J[], int n, char usuario[], char clave[]);
+
+int leer_jugadores(TJugador J[], int n);
+
+
+void inicializar_tablero(char Tablero[FILAS][COLUMNAS]);
+
+void mostrar_tablero(char Tablero[FILAS][COLUMNAS]);
+
+int leer_turno(char usuario[], char ficha, int faltas, int *colIngresada);
+
+void aplicar_movimiento(char Tablero[FILAS][COLUMNAS], int C, char Ficha);
+
+int verificar_victoria(char Tablero[FILAS][COLUMNAS], char Ficha);
+
+int verificar_tablero_lleno(char Tablero[FILAS][COLUMNAS]);
+
+void actualizar_estadisticas_jugadores(TJugador *j1, TJugador *j2, int resultado);
+
+void mostrar_informe_partida(TPartida p, TJugador j1, TJugador j2, char Tablero[FILAS][COLUMNAS]);
+
+
+/*
+- Nombre: mostrar_inicioyjugadores
+- Tipo: Procedimiento
+- Descripción: Muestra por pantalla el titulo de iniciar sesion y las lista de jugadores precargados.
+- Parámetro de entrada: J[] (Arreglo TJugador), n (int - dimensión lógica)
+- Parámetro de salida: -
+- Mecanismo de pasaje: J[] Por Referencia.  n Por Valor.
+ */
+void mostrar_inicioyjugadores(TJugador J[], int n) {
+    printf("\n===================================\n");
+    printf("      INICIO DE SESION DE JUGADORES \n");
+    printf("===================================\n");
+
+    /* Mostramos lista de todos los usuarios y claves disponibles */
+    printf("\n--------- USUARIOS REGISTRADOS --------\n");
+    printf("%s | %s | %s\n", "ID", "Usuario", "Clave");
+    printf("---------------------------------------\n");
+    for (int i = 0; i < n; i++) {
+        printf("%-6d | %-12s | %-10s\n", J[i].idJugador, J[i].usuario, J[i].clave);
+    }
+    printf("---------------------------------------\n");
+}
+
+/*
+- Nombre: posicion_jugador
+- Tipo: Función
+- Descripción: Busca secuencialmente a un usuario y clave en el arreglo de registros y si no existe devuelve -1.
+- Parámetro de entrada: J[] (Arreglo TJugador), n (int - dimensión lógica), usuario[] (char), clave[] (char)
+- Parámetro de salida: int (índice en el arreglo si existe, -1 si no se encuentra)
+- Mecanismo de pasaje: J[] Por Referencia.  n, usuario[], clave[] Por Valor.
+ */
+int posicion_jugador(TJugador J[], int n, char usuario[], char clave[]) {
+    ///strcmp te da 0 si son textos iguales
+    int posicion = -1;
+    for (int i = 0; i < n; i++) {
+        if (strcmp(J[i].usuario, usuario) == 0 && strcmp(J[i].clave, clave) == 0) {
+            posicion = i;
+        }
+    }
+    return posicion;
+}
+
+/*
+- Nombre: leer jugadores
+- Tipo: Función
+- Descripción: Solicita usuario y contraseña por pantalla hasta que sea valido y retorna posicion.
+- Parámetro de entrada: J[] (Arreglo TJugador), n (int)
+- Parámetro de salida: int (posición del jugador autenticado)
+- Mecanismo de pasaje: J[] Por Referencia, n Por Valor
+ */
+int leer_jugadores(TJugador J[], int n) {
+    char usuario[11], clave[11];
+    int pos = -1;
+    do {
+        printf("Usuario:\n");
+        scanf("%s", usuario);
+        printf("clave:\n");
+        scanf("%s", clave);
+
+        pos = posicion_jugador(J, n, usuario, clave); ///BUSCAR POSICION DE JUG SINO -1
+        if (pos == -1) {
+            printf("Usuario y/o clave incorrecto\n");
+        }
+    } while (pos == -1);
+    return pos;
+}
+
+/*
+- Nombre: inicio sesion
+- Tipo: Procedimiento
+- Descripción: muestra por pantalla el orden de lectura, y confirma los jugadores.
+Ademas gestiona la carga "por refencia" de las posiciones los jugadores 1y2
+- Parámetro de entrada: J[] (Arreglo TJugador), n (int)
+- Parámetro de salida: jugador1 (int), jugador2(int)
+- Mecanismo de pasaje: jugador1, jugador2, J[] Por Referencia.  n Por Valor.
+ */
+void inicio_sesion(int *jugador1, int *jugador2, TJugador J[], int n) {
+    printf("\n--- JUGADOR 1 ---\n");
+    *jugador1 = leer_jugadores(J, n); ////buscamos posicion en vector tipo registro J
+
+    printf("\n--- JUGADOR 2 ---\n");
+    do {
+        *jugador2 = leer_jugadores(J, n);
+        if (*jugador1 == *jugador2) {
+            printf("-> ¡Error! El Jugador 2 debe ser un usuario distinto al 1.\n");
+        }
+    } while (*jugador2 == *jugador1);
+
+    printf("Inicios de sesion confirmados.\n");
+    printf("Jugador 1: %s --FICHA---> X \n", J[*jugador1].usuario);
+    printf("Jugador 2: %s --FICHA---> O \n", J[*jugador2].usuario);
+}
+
+/*
+- Nombre: inicializar_tablero
+- Tipo: Procedimiento
+- Descripción: Limpia e inicializa todas las celdas de la matriz con el carácter espacio (' ').
+- Parámetro de entrada: -
+- Parámetro de salida: -
+- Parámetro de Entrada/Salida: Tablero[FILAS][COLUMNAS] (Matriz de char)
+- Mecanismo de pasaje: Tablero Por Referencia
+ */
+void inicializar_tablero(char Tablero[FILAS][COLUMNAS]) {
+    int f, c;
+    for (f = 0; f < FILAS; f++) {
+        for (c = 0; c < COLUMNAS; c++) {
+            Tablero[f][c] = ' ';
+        }
+    }
+}
+
+/*
+- Nombre: mostrar_tablero
+- Tipo: Procedimiento
+- Descripción: Muestra en pantalla la matriz del juego con el formato de celdas visuales e índices de columna.
+- Parámetro de entrada: Tablero[FILAS][COLUMNAS] (Matriz de char)
+- Parámetro de salida: Ninguno (impresión en consola)
+- Mecanismo de pasaje: Tablero Por Referencia
+ */
+void mostrar_tablero(char Tablero[FILAS][COLUMNAS]) {
+    int f, c;
+    printf("\n===================================\n");
+    printf("            4 EN LINEA             ");
+    printf("\n===================================\n");
+
+    printf("\n  1   2   3   4   5   6   7\n");
+    printf("-----------------------------\n");
+    for (int f = 0; f < FILAS; f++) {
+        for (int c = 0; c < COLUMNAS; c++) {
+            printf("| %c ", Tablero[f][c]);
+        }
+        printf("|\n");
+    }
+    printf("-----------------------------\n");
+}
+
+/*
+- Nombre: pedirenTurno
+- Tipo: Función
+- Descripción: Muestra jugador, su ficha y faltas consecutivas.
+Solicita una columna y retorna 1 si se leyó correctamente un valor numérico.
+- Parámetros de entrada: usuario (Cadena de caracteres), símbolo (char), faltas (int).
+- Parámetro de salida: colIngresada (int).
+- Valor de retorno: 1 si se leyó correctamente un valor numérico o 0 si la lectura no fue válida.
+- Mecanismo de pasaje: usuario, símbolo y faltas por valor. colIngresada por referencia
+ */
+int pedirenTurno(char usuario[], char ficha, int faltas, int *colIngresada) {
+
+    printf("Turno de %s ('%c') | Faltas consecutivas: %d/3\n",
+           usuario, ficha, faltas);
+
+    printf("Elija una columna (1-7): ");
+
+    if (scanf("%d", colIngresada) == 1) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+/*
+- Nombre: ver_faltas
+- Tipo: Procedimiento
+- Descripción: verifica que las faltas no lleguen a 3, sino activa la bandera fin
+- Parámetros de entrada:  usuario[](char),faltasJ(int),)
+- Parámetro de salida: *bandera_fin (int), *p(TPartida)
+- Mecanismo de pasaje: usuario, faltasJ por valor. bandera_fin,p por referencia
+ */
+void ver_faltas(char usuario[], int faltasJ, int *bandera_fin, TPartida *p) {
+    if (faltasJ >= 3) {
+        *bandera_fin = 1;
+        (*p).resultado = -1;
+        strcpy((*p).motivo, "Descalificacion de Jugador por 3 faltas consecutivas");
+        printf("\n¡JUGADOR %s DESCALIFICADO POR ACUMULAR 3 FALTAS CONSECUTIVAS!\n", usuario);
+    }
+}
+
+/*
+- Nombre: aplicar_movimiento
+- Tipo: Procedimiento
+- Descripción: Ubica la ficha en la posición más baja disponible de la columna seleccionada (gravedad).
+- Parámetro de entrada: C (int), Ficha (char)
+- Parámetro de salida: Ninguno (modifica la matriz Tablero)
+- Parámetro de Entrada/Salida: Tablero[FILAS][COLUMNAS] (Matriz de char)
+- Mecanismo de pasaje: Tablero Por Referencia, C Por Valor, Ficha Por Valor
+ */
+void aplicar_movimiento(char Tablero[FILAS][COLUMNAS], int C, char Ficha) {
+    int fila = FILAS - 1;
+    int colocada = 0;
+
+    while (fila >= 0 && colocada == 0) {
+        if (Tablero[fila][C - 1] == ' ') {
+            Tablero[fila][C - 1] = Ficha;
+            colocada = 1;
+        }
+        fila--;
+    }
+}
+
+
+/*
+- Nombre: verificar_victoria
+- Tipo: Función
+- Descripción: Examina la matriz en 4 direcciones (horizontal, vertical, diagonal \ y diagonal /) buscando 4 en línea.
+- Parámetro de entrada: Tablero[FILAS][COLUMNAS] (Matriz de char), Ficha (char)
+- Parámetro de salida: int (1: se detectó 4 en línea, 0: sin victoria)
+- Mecanismo de pasaje: Tablero Por Referencia, Ficha Por Valor
+ */
+int verificar_victoria(char Tablero[FILAS][COLUMNAS], char Ficha) {
+    int hay_victoria = 0;
+    int f, c;
+    f = 0; // 1. Verificación Horizontal
+    while (f < FILAS && hay_victoria == 0) {
+        c = 0;
+        while (c <= COLUMNAS - 4 && hay_victoria == 0) {
+            if (Tablero[f][c] == Ficha &&
+                Tablero[f][c + 1] == Ficha &&
+                Tablero[f][c + 2] == Ficha &&
+                Tablero[f][c + 3] == Ficha) {
+                hay_victoria = 1;
+            }
+            c++;
+        }
+        f++;
+    }
+
+    f = 0; // 2. Verificación Vertical
+    while (f <= FILAS - 4 && hay_victoria == 0) {
+        c = 0;
+        while (c < COLUMNAS && hay_victoria == 0) {
+            if (Tablero[f][c] == Ficha &&
+                Tablero[f + 1][c] == Ficha &&
+                Tablero[f + 2][c] == Ficha &&
+                Tablero[f + 3][c] == Ficha) {
+                hay_victoria = 1;
+            }
+            c++;
+        }
+        f++;
+    }
+
+    f = 0; // 3. Verificación Diagonal Descendente (\)
+    while (f <= FILAS - 4 && hay_victoria == 0) {
+        c = 0;
+        while (c <= COLUMNAS - 4 && hay_victoria == 0) {
+            if (Tablero[f][c] == Ficha &&
+                Tablero[f + 1][c + 1] == Ficha &&
+                Tablero[f + 2][c + 2] == Ficha &&
+                Tablero[f + 3][c + 3] == Ficha) {
+                hay_victoria = 1;
+            }
+            c++;
+        }
+        f++;
+    }
+
+    f = 3; // 4. Verificación Diagonal Ascendente (/)
+    while (f < FILAS && hay_victoria == 0) {
+        c = 0;
+        while (c <= COLUMNAS - 4 && hay_victoria == 0) {
+            if (Tablero[f][c] == Ficha &&
+                Tablero[f - 1][c + 1] == Ficha &&
+                Tablero[f - 2][c + 2] == Ficha &&
+                Tablero[f - 3][c + 3] == Ficha) {
+                hay_victoria = 1;
+            }
+            c++;
+        }
+        f++;
+    }
+
+    return hay_victoria;
+}
+
+/*
+- Nombre: verificar_tablero_lleno
+- Tipo: Función
+- Descripción: Comprueba si la primera fila (fila 0) no tiene espacios libres (tablero lleno).
+- Parámetro de entrada: Tablero[FILAS][COLUMNAS] (Matriz de char)
+- Parámetro de salida: int (1: tablero completamente lleno, 0: aún hay casillas disponibles)
+- Mecanismo de pasaje: Tablero Por Referencia
+ */
+int verificar_tablero_lleno(char Tablero[FILAS][COLUMNAS]) {
+    int lleno = 1;
+    int c = 0;
+
+    while (c < COLUMNAS && lleno == 1) {
+        if (Tablero[0][c] == ' ') {
+            lleno = 0;
+        }
+        c++;
+    }
+
+    return lleno;
+}
+
+/*
+- Nombre: actualizar_estadisticas_jugadores
+- Tipo: Procedimiento
+- Descripción: Actualiza acumulativamente las victorias, partidas jugadas y racha de victorias de los jugadores.
+- Parámetro de entrada: resultado (int - código de resultado)
+- Parámetro de salida: Ninguno (modifica los registros a través de los punteros)
+- Parámetro de Entrada/Salida: j1 (TJugador *), j2 (TJugador *)
+- Mecanismo de pasaje: j1 Por Referencia, j2 Por Referencia, resultado Por Valor
+ */
+void actualizar_estadisticas_jugadores(TJugador *j1, TJugador *j2, int resultado) {
+    j1->partidasJugadas++;
+    j2->partidasJugadas++;
+
+    if (resultado == 1) {
+        /* Ganó J1 */
+        j1->cantidadVictorias++;
+        j1->rachaGanadas++;
+        j2->rachaGanadas = 0;
+    } else if (resultado == 2) {
+        /* Ganó J2 */
+        j2->cantidadVictorias++;
+        j2->rachaGanadas++;
+        j1->rachaGanadas = 0;
+    } else if (resultado == -1) {
+        /* Descalificado J1 -> Gana J2 */
+        j2->cantidadVictorias++;
+        j2->rachaGanadas++;
+        j1->rachaGanadas = 0;
+    } else if (resultado == -2) {
+        /* Descalificado J2 -> Gana J1 */
+        j1->cantidadVictorias++;
+        j1->rachaGanadas++;
+        j2->rachaGanadas = 0;
+    } else if (resultado == 0) {
+        /* Empate */
+        j1->rachaGanadas = 0;
+        j2->rachaGanadas = 0;
+    }
+}
+
+/*
+- Nombre: mostrar_estadisticas
+- Tipo: Procedimiento
+- Descripción: Muestra la tabla general con las estadísticas de todos los jugadores registrados.
+- Parámetro de entrada: J[] (Arreglo TJugador), n (int)
+- Parámetro de salida: Ninguno (impresión en consola)
+- Mecanismo de pasaje: J[] Por Referencia, n Por Valor
+ */
+void mostrar_estadisticas(TJugador J[], int n) {
+    int i;
+    double efectividad = 0.0;
+
+    printf("\n=======================================================\n");
+    printf("             TABLA DE ESTADISTICAS DE JUGADORES        \n");
+    printf("=======================================================\n");
+    printf("  ID   |   Usuario    | Partidas | Victorias |  Racha  |Efec. %\n");
+    printf("-------------------------------------------------------\n");
+
+    for (i = 0; i < n; i++) {
+        efectividad = 0.0;
+        if (J[i].partidasJugadas > 0) {
+            efectividad = ((double) J[i].cantidadVictorias * 100.0) / (double) J[i].partidasJugadas;
+        }
+        printf("%-6d | %-12s | %-8d | %-9d | %-7d | %5.1f%%\n",
+               J[i].idJugador, J[i].usuario, J[i].partidasJugadas,
+               J[i].cantidadVictorias, J[i].rachaGanadas, efectividad);
+    }
+    printf("=======================================================\n\n");
+}
+
+/*
+- Nombre: mostrar_informe_partida
+- Tipo: Procedimiento
+- Descripción: Muestra el informe detallado de la partida finalizada, el tablero final y las estadísticas actualizadas.
+- Parámetro de entrada: p (TPartida), j1 (TJugador), j2 (TJugador), Tablero[FILAS][COLUMNAS] (Matriz de char)
+- Parámetro de salida: Ninguno (impresión en consola)
+- Mecanismo de pasaje: p Por Valor, j1 Por Valor, j2 Por Valor, Tablero Por Referencia
+ */
+void mostrar_informe_partida(TPartida p, TJugador j1, TJugador j2, char Tablero[FILAS][COLUMNAS]) {
+    float pctJ1 = 0.0;
+    float pctJ2 = 0.0;
+
+    if (j1.partidasJugadas > 0) {
+        pctJ1 = ((float) j1.cantidadVictorias * 100.0) / (float) j1.partidasJugadas;
+    }
+    if (j2.partidasJugadas > 0) {
+        pctJ2 = ((float) j2.cantidadVictorias * 100.0) / (float) j2.partidasJugadas;
+    }
+
+    printf("\n=======================================================\n");
+    printf("               INFORME FINAL DE LA PARTIDA             \n");
+    printf("=======================================================\n");
+
+        printf("\n--- TABLERO FINAL ---\n");
+    mostrar_tablero(Tablero);
+
+    printf("--- RESUMEN DE LA PARTIDA ---\n");
+    printf("Jugador 1: %s (ID: %d)\n", j1.usuario, j1.idJugador);
+    printf("Jugador 2: %s (ID: %d)\n", j2.usuario, j2.idJugador);
+    printf("Duracion de la partida (total de turnos validos): %d\n", p.cantTurnos);
+    printf("Movimientos validos de %s: %d\n", j1.usuario, p.movJugador1);
+    printf("Movimientos validos de %s: %d\n", j2.usuario, p.movJugador2);
+    printf("Motivo de finalizacion: %s\n", p.motivo);
+
+    printf("\n--- ESTADISTICAS ACTUALIZADAS ---\n");
+    printf("Jugador %s:\n", j1.usuario);
+    printf("  Partidas Jugadas: %d | Victorias: %d | Racha Actual: %d\n", j1.partidasJugadas, j1.cantidadVictorias,
+           j1.rachaGanadas);
+    printf("  Porcentaje de victorias: %.2f%%\n", pctJ1);
+
+    printf("Jugador %s:\n", j2.usuario);
+    printf("  Partidas Jugadas: %d | Victorias: %d | Racha Actual: %d\n", j2.partidasJugadas, j2.cantidadVictorias,
+           j2.rachaGanadas);
+    printf("  Porcentaje de victorias: %.2f%%\n", pctJ2);
+    printf("=======================================================\n\n");
+}
+/*
+- Nombre: jugar_turno
+- Tipo: Procedimiento
+- Descripción: recibe los nombres de los 2 usuarios, tablero y el registro TPartida
+se encarga de jugar el turno del jugador que sigue sea el 1 o 2,para ello necesita el registro completo de la partida para ir modificando los campos de ser necesario,
+e indica con p.bandera_fin si la partida debe terminar
+- Parámetro de entrada: char usuario1[],char usuario2[],char Tablero[FILAS][COLUMNAS]
+- Parámetro de Entrada/Salida: TPartida *p
+- Mecanismo de pasaje: p, Tablero Por Referencia, usuario1,usuario2 Por Valor
+ */
+void jugar_turno(char usuario1[],char usuario2[],char Tablero[FILAS][COLUMNAS], TPartida *p) {
+  if (p->turno == 1) {
+            int colIngresada = 0;
+            pedirenTurno(usuario1, 'X', p->faltasJ1, &colIngresada);
+
+            if ((colIngresada < 1 || 7 < colIngresada) || Tablero[0][colIngresada - 1] != ' ') {
+                p->faltasJ1++;
+                printf(">> ¡Error! La columna %d fuera de rango (1-7) o llena. Se registra Falta (%d/3).\n",
+                       colIngresada, p->faltasJ1);
+                ver_faltas(usuario1, p->faltasJ1, &p->bandera_fin, p);
+            } else {
+                aplicar_movimiento(Tablero, colIngresada, 'X');
+                p->movJugador1++;
+                p->cantTurnos++;
+                if (verificar_victoria (Tablero, 'X')) {
+                    p->bandera_fin = 1;
+                    p->resultado = 1; // Gana J1
+                    strcpy(p->motivo, "Victoria de Jugador 1 por 4 en linea");
+                    printf("\n¡FELICITACIONES %s! ¡HAS GANADO LA PARTIDA CON 4 EN LINEA!\n", p->usuario1);
+                    mostrar_tablero(Tablero);
+                } else if (verificar_tablero_lleno(Tablero)) {
+                    p->bandera_fin = 1;
+                    p->resultado = 0; // Empate
+                    strcpy(p->motivo, "Empate por tablero lleno sin alineacion");
+                    printf("\n¡EL TABLERO SE HA LLENADO! LA PARTIDA TERMINA EN EMPATE.\n");
+                } else {
+                    p->turno = 2;
+                    p->faltasJ2 = 0;
+                }
+            }
+        } else {
+            int colIngresada = 0;
+            pedirenTurno(usuario2, 'O', p->faltasJ2, &colIngresada);
+
+            if ((colIngresada < 1 || 7 < colIngresada) || Tablero[0][colIngresada - 1] != ' ') {
+                p->faltasJ2++;
+                printf(">> ¡Error! La columna %d fuera de rango (1-7) o llena. Se registra Falta (%d/3).\n",
+                       colIngresada, p->faltasJ2);
+                ver_faltas(usuario2, p->faltasJ2, &p->bandera_fin, p);
+            } else {
+                aplicar_movimiento(Tablero, colIngresada, 'O');
+                p->movJugador2++;
+                p->cantTurnos++;
+                if (verificar_victoria(Tablero, 'O')) {
+                    p->bandera_fin = 1;
+                    p->resultado = 2; // Gana J1
+                    strcpy(p->motivo, "Victoria de Jugador 2 por 4 en linea");
+                    printf("\n¡FELICITACIONES %s! ¡HAS GANADO LA PARTIDA CON 4 EN LINEA!\n", usuario2);
+                    mostrar_tablero(Tablero);
+                } else if (verificar_tablero_lleno(Tablero)) {
+                    p->bandera_fin = 1;
+                    p->resultado = 0; // Empate
+                    strcpy(p->motivo, "Empate por tablero lleno sin alineacion");
+                    printf("\n¡EL TABLERO SE HA LLENADO! LA PARTIDA TERMINA EN EMPATE.\n");
+                } else {
+                    p->turno = 1;
+                    p->faltasJ1 = 0;
+                }
+            }
+        }
+}
+
+/*
+- Nombre: iniciar_partida
+- Tipo: Procedimiento
+- Descripción: Controla el flujo completo de una partida: autenticación de ambos jugadores,
+bucle de turnos, gestión de faltas, detección de fin de juego y reporte final.
+- Parámetro de entrada: n (int)
+- Parámetro de salida: -
+- Parámetro de Entrada/Salida: J[] (Arreglo TJugador)
+- Mecanismo de pasaje: J[] Por Referencia, n Por Valor
+ */
+void iniciar_partida(TJugador J[], int n) {
+    ///funcion que muestra texto inicio y lista de jugadores
+    mostrar_inicioyjugadores(J, n);
+
+    int jugador1, jugador2;
+
+    inicio_sesion(&jugador1, &jugador2, J, n);
+
+    // Configuración de la partida
+
+    char Tablero[FILAS][COLUMNAS];
+
+    inicializar_tablero(Tablero);
+
+    TPartida p;
+    p.idJugador1 = J[jugador1].idJugador;
+    p.idJugador2 = J[jugador2].idJugador;
+    p.movJugador1 = 0;
+    p.movJugador2 = 0;
+    p.cantTurnos = 0;
+    p.resultado = 0;
+    strcpy(p.motivo, ""); ///strcpy asigna texto a una variable char
+    p.faltasJ1 = 0;
+    p.faltasJ2 = 0;
+    p.turno = 1;
+    p.bandera_fin = 0;
+
+    printf("\n¡COMIENZA LA PARTIDA!\n");
+    while (p.bandera_fin == 0) {
+        mostrar_tablero(Tablero);
+        jugar_turno(J[jugador1].usuario,J[jugador2].usuario,Tablero,&p);
+    }
+    actualizar_estadisticas_jugadores(&J[jugador1], &J[jugador2], p.resultado);
+    mostrar_informe_partida(p, J[jugador1], J[jugador2], Tablero);
+}
+/*
+- Nombre: mostrar_menu
+- Tipo: Procedimiento
+- Descripción: Muestra las opciones principales del menú del juego en pantalla.
+- Parámetro de entrada: Ninguno (void)
+- Parámetro de salida: Ninguno (impresión en consola)
+- Mecanismo de pasaje: No aplica
+ */
+void mostrar_menu(void) {
+    printf("\n*****************************************\n");
+    printf("\tBIENVENIDO/A - 4 EN LINEA\n");
+    printf("*****************************************\n");
+    printf("1 - Iniciar partida\n");
+    printf("2 - Estadisticas\n");
+    printf("3 - Salir\n");
+}
+
+int main(void) {
+    TJugador J[N] = {
+        {101, "jere", "1234", 2, 4, 4},
+        {105, "nikol", "4321", 0, 0, 10},
+        {110, "oreju", "2026", 10, 100, 10000},
+        {115, "micap", "2523", 5, 10, 20}
+    };
+    int opcion;
+    do {
+        mostrar_menu();
+
+        printf("\n Elija una opcion:\n ");
+        scanf("%d", &opcion);
+
+        switch (opcion) {
+            case 1: iniciar_partida(J,N);
+                break;
+            case 2: mostrar_estadisticas(J,N);
+                break;
+            case 3: printf("\n¡Gracias por jugar!\n");
+                break;
+            default: printf("\nOpcion invalida.\n");
+        }
+    } while (opcion != 3);
+
+    return 0;
+}
